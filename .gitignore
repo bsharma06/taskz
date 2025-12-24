@@ -1,0 +1,19 @@
+# Environment variables
+/backend/.env
+/backend/venv
+
+# Python cache files
+/backend/app/__pycache__
+/backend/app/api/__pycache__
+/backend/app/api/routes/__pycache__
+/backend/app/core/__pycache__
+/backend/app/db/__pycache__
+/backend/app/models/__pycache__
+/backend/app/schemas/__pycache__
+/backend/app/utils/__pycache__
+
+# Test files
+/backend/.pytest_cache
+/backend/tests/__pycache__
+
+
