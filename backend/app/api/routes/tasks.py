@@ -5,8 +5,8 @@ from app.db.session import SessionLocal
 from app.models.task import Task
 from app.models.user import User
 from app.schemas.task_schema import TaskCreate, TaskRead, TaskUpdate
-from app.api.routes.auth import get_current_user, get_current_user_tenant_id
-from typing import List, Optional
+from app.api.routes.auth import get_current_user
+from typing import List
 
 router = APIRouter()
 
@@ -23,11 +23,10 @@ def get_db():
 @router.get("/", response_model=List[TaskRead])
 def list_tasks(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """List all tasks for the current user's tenant."""
-    tasks = db.query(Task).filter(Task.tenant_id == tenant_id).all()
+    """List all tasks."""
+    tasks = db.query(Task).all()
     return tasks
 
 
@@ -35,20 +34,18 @@ def list_tasks(
 def add_task(
     task_in: TaskCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
     """Create a new task."""
-    # Verify assigned user exists and belongs to the same tenant
-    assigned_user = db.query(User).filter(
-        User.id == task_in.assigned_to,
-        User.tenant_id == tenant_id
-    ).first()
-    if not assigned_user:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Assigned user not found or does not belong to your tenant"
-        )
+    # # Verify assigned user exists
+    # assigned_user = db.query(User).filter(
+    #     User.id == task_in.assigned_to
+    # ).first()
+    # if not assigned_user:
+    #     raise HTTPException(
+    #         status_code=status.HTTP_404_NOT_FOUND,
+    #         detail="Assigned user not found"
+    #     )
 
     new_task = Task(
         id=str(uuid4()),
@@ -58,8 +55,8 @@ def add_task(
         due_date=task_in.due_date,
         priority=task_in.priority,
         status=task_in.status,
+        created_by=task_in.created_by,
         assigned_to=task_in.assigned_to,
-        tenant_id=tenant_id,
     )
 
     try:
@@ -79,14 +76,10 @@ def add_task(
 def get_task(
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a task by ID (only if it belongs to user's tenant)."""
-    task = db.query(Task).filter(
-        Task.id == task_id,
-        Task.tenant_id == tenant_id
-    ).first()
+    """Get a task by ID."""
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -100,30 +93,25 @@ def update_task(
     task_id: str,
     task_in: TaskUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """Update a task (only if it belongs to user's tenant)."""
-    task = db.query(Task).filter(
-        Task.id == task_id,
-        Task.tenant_id == tenant_id
-    ).first()
+    """Update a task."""
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
         )
 
-    # If assigned_to is being updated, verify the user exists and belongs to tenant
+    # If assigned_to is being updated, verify the user exists
     if task_in.assigned_to is not None:
         assigned_user = db.query(User).filter(
-            User.id == task_in.assigned_to,
-            User.tenant_id == tenant_id
+            User.id == task_in.assigned_to
         ).first()
         if not assigned_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
-                detail="Assigned user not found or does not belong to your tenant"
+                detail="Assigned user not found"
             )
         task.assigned_to = task_in.assigned_to
 
@@ -156,14 +144,10 @@ def update_task(
 def delete_task(
     task_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """Delete a task (only if it belongs to user's tenant)."""
-    task = db.query(Task).filter(
-        Task.id == task_id,
-        Task.tenant_id == tenant_id
-    ).first()
+    """Delete a task."""
+    task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,

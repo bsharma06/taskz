@@ -1,4 +1,4 @@
-from app.models import user, task, tenant
+from app.models import user, task
 from app.models.base import Base
 from app.db.session import engine
 

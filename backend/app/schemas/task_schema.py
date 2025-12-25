@@ -15,6 +15,7 @@ class TaskBase(BaseModel):
 
 class TaskCreate(TaskBase):
     """Schema for creating a task."""
+    created_by: str
     assigned_to: str
 
 
@@ -32,7 +33,7 @@ class TaskUpdate(BaseModel):
 class TaskRead(TaskBase):
     """Schema for reading a task."""
     id: str
+    created_by: str
     assigned_to: str
-    tenant_id: str
 
     model_config = ConfigDict(from_attributes=True)

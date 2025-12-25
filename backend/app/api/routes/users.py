@@ -3,10 +3,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.user import User
-from app.models.tenant import Tenant
 from app.schemas.user_schema import UserCreate, UserRead, UserUpdate
 from app.core.security import get_password_hash, verify_password
-from app.api.routes.auth import get_current_user, get_current_user_tenant_id
+from app.api.routes.auth import get_current_user, get_optional_token
 from typing import List, Optional
 
 router = APIRouter()
@@ -24,11 +23,10 @@ def get_db():
 @router.get("/", response_model=List[UserRead])
 def list_users(
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """List all users in the current user's tenant."""
-    users = db.query(User).filter(User.tenant_id == tenant_id).all()
+    """List all users."""
+    users = db.query(User).all()
     return users
 
 
@@ -36,35 +34,44 @@ def list_users(
 def add_user(
     user_in: UserCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    token: Optional[str] = Depends(get_optional_token)
 ):
-    """Create a new user in the current user's tenant."""
-    # Ensure user is created in the same tenant as the current user
-    if user_in.tenant_id != tenant_id:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Cannot create user in a different tenant"
-        )
-
-    # Verify tenant exists
-    tenant = db.query(Tenant).filter(Tenant.id == user_in.tenant_id).first()
-    if not tenant:
-        raise HTTPException(
-            status_code=status.HTTP_404_NOT_FOUND,
-            detail="Tenant not found"
-        )
-
+    """Create a new user. If user is new, allow creation without auth. If user exists, require auth."""
     # Check if user email already exists
     existing_user = db.query(User).filter(
         User.user_email == user_in.user_email
     ).first()
+    
+    # If user exists, require authentication
     if existing_user:
+        if not token:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="User already exists. Authentication required.",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        # Verify the token is valid and belongs to this user
+        from app.core.security import decode_access_token
+        payload = decode_access_token(token)
+        if not payload or "sub" not in payload:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Invalid or expired token",
+                headers={"WWW-Authenticate": "Bearer"},
+            )
+        user_id = payload["sub"]
+        if user_id != existing_user.id:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Not authorized to modify this user"
+            )
+        # If we get here, user exists and is authenticated - return existing user
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="User with this email already exists"
         )
 
+    # User is new, allow creation without auth
     # Hash password
     hashed_password = get_password_hash(user_in.pwd)
 
@@ -73,7 +80,6 @@ def add_user(
         user_email=user_in.user_email,
         user_name=user_in.user_name,
         pwd=hashed_password,
-        tenant_id=user_in.tenant_id,
     )
 
     try:
@@ -93,14 +99,10 @@ def add_user(
 def get_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """Get a user by ID (only if they belong to user's tenant)."""
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == tenant_id
-    ).first()
+    """Get a user by ID."""
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
@@ -114,18 +116,21 @@ def update_user(
     user_id: str,
     user_in: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """Update a user (only if they belong to user's tenant)."""
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == tenant_id
-    ).first()
+    """Update a user."""
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+    
+    # Only allow users to update their own account
+    if user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this user"
         )
 
     # Check if email is being changed and if it's already taken
@@ -163,18 +168,21 @@ def update_user(
 def delete_user(
     user_id: str,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-    tenant_id: Optional[str] = Depends(get_current_user_tenant_id)
+    current_user: User = Depends(get_current_user)
 ):
-    """Delete a user (only if they belong to user's tenant)."""
-    user = db.query(User).filter(
-        User.id == user_id,
-        User.tenant_id == tenant_id
-    ).first()
+    """Delete a user."""
+    user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
+        )
+    
+    # Only allow users to delete their own account
+    if user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this user"
         )
 
     try:

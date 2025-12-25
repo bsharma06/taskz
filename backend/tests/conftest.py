@@ -21,7 +21,6 @@ def hash_password_for_test(password: str) -> str:
 from app.main import app
 from app.db.session import SessionLocal
 from app.models.base import Base
-from app.models.tenant import Tenant
 from app.models.user import User
 from app.models.task import Task
 
@@ -58,8 +57,7 @@ def client(db_session):
             pass
 
     # Override get_db in all route modules
-    from app.api.routes import tenants, users, tasks, auth
-    app.dependency_overrides[tenants.get_db] = override_get_db
+    from app.api.routes import users, tasks, auth
     app.dependency_overrides[users.get_db] = override_get_db
     app.dependency_overrides[tasks.get_db] = override_get_db
     app.dependency_overrides[auth.get_db] = override_get_db
@@ -102,27 +100,13 @@ def client(db_session):
 
 
 @pytest.fixture
-def test_tenant(db_session):
-    """Create a test tenant."""
-    tenant = Tenant(
-        id=str(uuid4()),
-        name="Test Tenant"
-    )
-    db_session.add(tenant)
-    db_session.commit()
-    db_session.refresh(tenant)
-    return tenant
-
-
-@pytest.fixture
-def test_user(db_session, test_tenant):
+def test_user(db_session):
     """Create a test user."""
     user = User(
         id=str(uuid4()),
         user_email="test@example.com",
         user_name="Test User",
-        pwd=hash_password_for_test("testpassword123"),
-        tenant_id=test_tenant.id
+        pwd=hash_password_for_test("testpassword123")
     )
     db_session.add(user)
     db_session.commit()
@@ -131,43 +115,13 @@ def test_user(db_session, test_tenant):
 
 
 @pytest.fixture
-def test_user2(db_session, test_tenant):
-    """Create a second test user in the same tenant."""
+def test_user2(db_session):
+    """Create a second test user."""
     user = User(
         id=str(uuid4()),
         user_email="test2@example.com",
         user_name="Test User 2",
-        pwd=hash_password_for_test("testpassword123"),
-        tenant_id=test_tenant.id
-    )
-    db_session.add(user)
-    db_session.commit()
-    db_session.refresh(user)
-    return user
-
-
-@pytest.fixture
-def test_tenant2(db_session):
-    """Create a second test tenant."""
-    tenant = Tenant(
-        id=str(uuid4()),
-        name="Test Tenant 2"
-    )
-    db_session.add(tenant)
-    db_session.commit()
-    db_session.refresh(tenant)
-    return tenant
-
-
-@pytest.fixture
-def test_user_other_tenant(db_session, test_tenant2):
-    """Create a test user in a different tenant."""
-    user = User(
-        id=str(uuid4()),
-        user_email="other@example.com",
-        user_name="Other User",
-        pwd=hash_password_for_test("testpassword123"),
-        tenant_id=test_tenant2.id
+        pwd=hash_password_for_test("testpassword123")
     )
     db_session.add(user)
     db_session.commit()

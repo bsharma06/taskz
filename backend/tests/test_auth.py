@@ -50,7 +50,6 @@ def test_get_current_user(client, auth_headers, test_user):
     assert data["id"] == test_user.id
     assert data["user_email"] == test_user.user_email
     assert data["user_name"] == test_user.user_name
-    assert data["tenant_id"] == test_user.tenant_id
 
 
 def test_get_current_user_no_token(client):

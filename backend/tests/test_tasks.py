@@ -18,8 +18,7 @@ def test_task(client, db_session, test_user, auth_headers):
         due_date=datetime.now(timezone.utc) + timedelta(days=7),
         priority="high",
         status="pending",
-        assigned_to=test_user.id,
-        tenant_id=test_user.tenant_id
+        assigned_to=test_user.id
     )
     db_session.add(task)
     db_session.commit()
@@ -50,7 +49,6 @@ def test_create_task(client, test_user, auth_headers):
     assert data["title"] == "New Task"
     assert data["assigned_to"] == test_user.id
     assert "id" in data
-    assert "tenant_id" in data
 
 
 def test_create_task_unauthorized(client, test_user):
@@ -73,29 +71,10 @@ def test_create_task_unauthorized(client, test_user):
     assert response.status_code == status.HTTP_401_UNAUTHORIZED
 
 
-def test_create_task_user_other_tenant(client, test_user_other_tenant, auth_headers):
-    """Test creating task assigned to user from different tenant."""
-    start_date = datetime.now(timezone.utc)
-    due_date = start_date + timedelta(days=7)
-
-    response = client.post(
-        "/tasks/",
-        json={
-            "title": "New Task",
-            "description": "Task Description",
-            "start_date": start_date.isoformat(),
-            "due_date": due_date.isoformat(),
-            "priority": "medium",
-            "status": "pending",
-            "assigned_to": test_user_other_tenant.id
-        },
-        headers=auth_headers
-    )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_list_tasks(client, test_task, auth_headers):
-    """Test listing tasks in tenant."""
+    """Test listing tasks."""
     response = client.get("/tasks/", headers=auth_headers)
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -160,14 +139,6 @@ def test_update_task_partial(client, test_task, auth_headers):
     assert data["title"] == test_task.title  # Other fields unchanged
 
 
-def test_update_task_user_other_tenant(client, test_task, test_user_other_tenant, auth_headers):
-    """Test updating task with user from different tenant."""
-    response = client.put(
-        f"/tasks/{test_task.id}",
-        json={"assigned_to": test_user_other_tenant.id},
-        headers=auth_headers
-    )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_delete_task(client, test_task, auth_headers):

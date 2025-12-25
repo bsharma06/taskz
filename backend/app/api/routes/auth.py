@@ -1,10 +1,13 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
+from fastapi.security.utils import get_authorization_scheme_param
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.user import User
 from app.core.security import verify_password, create_access_token, decode_access_token
 from app.schemas.user_schema import UserRead
+from typing import Optional
+from fastapi import Request
 
 router = APIRouter()
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl="/auth/login")
@@ -33,11 +36,22 @@ def login(
             detail="Invalid email or password",
             headers={"WWW-Authenticate": "Bearer"},
         )
-    # Create JWT containing user ID and tenant_id
+    # Create JWT containing user ID
     access_token = create_access_token(
-        data={"sub": str(user.id), "tenant_id": str(user.tenant_id)}
+        data={"sub": str(user.id)}
     )
     return {"access_token": access_token, "token_type": "bearer"}
+
+
+def get_optional_token(request: Request) -> Optional[str]:
+    """Dependency to get optional token."""
+    authorization = request.headers.get("Authorization")
+    if not authorization:
+        return None
+    scheme, token = get_authorization_scheme_param(authorization)
+    if scheme.lower() != "bearer":
+        return None
+    return token
 
 
 def get_current_user(
@@ -63,11 +77,6 @@ def get_current_user(
     return user
 
 
-def get_current_user_tenant_id(
-    current_user: User = Depends(get_current_user)
-) -> str:
-    """Dependency to get current user's tenant ID."""
-    return current_user.tenant_id
 
 
 @router.get("/me", response_model=UserRead)

@@ -3,66 +3,48 @@ import pytest
 from fastapi import status
 
 
-def test_create_user(client, test_tenant, auth_headers):
-    """Test creating a new user."""
+def test_create_user(client):
+    """Test creating a new user without authentication."""
     response = client.post(
         "/users/",
         json={
             "user_email": "newuser@example.com",
             "user_name": "New User",
-            "pwd": "password123",
-            "tenant_id": test_tenant.id
-        },
-        headers=auth_headers
+            "pwd": "password123"
+        }
     )
     assert response.status_code == status.HTTP_201_CREATED
     data = response.json()
     assert data["user_email"] == "newuser@example.com"
     assert data["user_name"] == "New User"
-    assert data["tenant_id"] == test_tenant.id
     assert "id" in data
     # Password should not be in response
     assert "pwd" not in data
 
 
-def test_create_user_unauthorized(client, test_tenant):
-    """Test creating user without authentication."""
-    response = client.post(
-        "/users/",
-        json={
-            "user_email": "newuser@example.com",
-            "user_name": "New User",
-            "pwd": "password123",
-            "tenant_id": test_tenant.id
-        }
-    )
-    assert response.status_code == status.HTTP_401_UNAUTHORIZED
-
-
-def test_create_user_different_tenant(client, test_tenant2, auth_headers, test_user):
-    """Test creating user in different tenant (should fail)."""
-    response = client.post(
-        "/users/",
-        json={
-            "user_email": "newuser@example.com",
-            "user_name": "New User",
-            "pwd": "password123",
-            "tenant_id": test_tenant2.id
-        },
-        headers=auth_headers
-    )
-    assert response.status_code == status.HTTP_403_FORBIDDEN
-
-
-def test_create_user_duplicate_email(client, test_user, auth_headers):
-    """Test creating user with duplicate email."""
+def test_create_user_existing_requires_auth(client, test_user):
+    """Test creating user with existing email requires authentication."""
     response = client.post(
         "/users/",
         json={
             "user_email": test_user.user_email,
             "user_name": "Another User",
-            "pwd": "password123",
-            "tenant_id": test_user.tenant_id
+            "pwd": "password123"
+        }
+    )
+    assert response.status_code == status.HTTP_401_UNAUTHORIZED
+
+
+
+
+def test_create_user_duplicate_email_with_auth(client, test_user, auth_headers):
+    """Test creating user with duplicate email when authenticated."""
+    response = client.post(
+        "/users/",
+        json={
+            "user_email": test_user.user_email,
+            "user_name": "Another User",
+            "pwd": "password123"
         },
         headers=auth_headers
     )
@@ -70,7 +52,7 @@ def test_create_user_duplicate_email(client, test_user, auth_headers):
 
 
 def test_list_users(client, test_user, auth_headers):
-    """Test listing users in tenant."""
+    """Test listing users."""
     response = client.get("/users/", headers=auth_headers)
     assert response.status_code == status.HTTP_200_OK
     data = response.json()
@@ -95,13 +77,6 @@ def test_get_user(client, test_user, auth_headers):
     assert data["user_email"] == test_user.user_email
 
 
-def test_get_user_other_tenant(client, test_user_other_tenant, auth_headers):
-    """Test getting user from different tenant (should fail)."""
-    response = client.get(
-        f"/users/{test_user_other_tenant.id}",
-        headers=auth_headers
-    )
-    assert response.status_code == status.HTTP_404_NOT_FOUND
 
 
 def test_update_user(client, test_user, auth_headers):

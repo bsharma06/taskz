@@ -6,7 +6,6 @@ class UserBase(BaseModel):
     """Base user schema."""
     user_email: EmailStr
     user_name: str
-    tenant_id: str
 
 
 class UserCreate(UserBase):

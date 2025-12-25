@@ -1,12 +1,11 @@
 # uvicorn app.main:app --reload
 
 from fastapi import FastAPI
-from app.api.routes import tasks, users, tenants, auth
+from app.api.routes import tasks, users, auth
 
 app = FastAPI(title="taskz")
 
 app.include_router(auth.router, prefix="/auth", tags=["Auth"])
-app.include_router(tenants.router, prefix="/tenants", tags=["Tenants"])
 app.include_router(users.router, prefix="/users", tags=["Users"])
 app.include_router(tasks.router, prefix="/tasks", tags=["Tasks"])
 

@@ -12,9 +12,8 @@ class Task(Base):
     due_date = Column(DateTime(timezone=True), index=True)
     priority = Column(String, index=True)
     status = Column(String, index=True)
-    assigned_to = Column(String, ForeignKey("users.id"))
-    tenant_id = Column(String, ForeignKey("tenants.id"))
-
-    tenant = relationship("Tenant", backref="tasks")
+    created_by = Column(String, index=True)
+    assigned_to = Column(String, ForeignKey("users.user_email"))
+    
     assigned_to_user = relationship("User", back_populates="tasks")
 
