@@ -101,12 +101,13 @@ def client(db_session):
 
 @pytest.fixture
 def test_user(db_session):
-    """Create a test user."""
+    """Create a test user with normal role."""
     user = User(
         id=str(uuid4()),
         user_email="test@example.com",
         user_name="Test User",
-        pwd=hash_password_for_test("testpassword123")
+        pwd=hash_password_for_test("testpassword123"),
+        role="normal"
     )
     db_session.add(user)
     db_session.commit()
@@ -116,17 +117,54 @@ def test_user(db_session):
 
 @pytest.fixture
 def test_user2(db_session):
-    """Create a second test user."""
+    """Create a second test user with normal role."""
     user = User(
         id=str(uuid4()),
         user_email="test2@example.com",
         user_name="Test User 2",
-        pwd=hash_password_for_test("testpassword123")
+        pwd=hash_password_for_test("testpassword123"),
+        role="normal"
     )
     db_session.add(user)
     db_session.commit()
     db_session.refresh(user)
     return user
+
+
+@pytest.fixture
+def test_admin(db_session):
+    """Create a test admin user."""
+    user = User(
+        id=str(uuid4()),
+        user_email="admin@example.com",
+        user_name="Admin User",
+        pwd=hash_password_for_test("testpassword123"),
+        role="admin"
+    )
+    db_session.add(user)
+    db_session.commit()
+    db_session.refresh(user)
+    return user
+
+
+@pytest.fixture
+def admin_auth_token(client, test_admin):
+    """Get authentication token for admin user."""
+    response = client.post(
+        "/auth/login",
+        data={
+            "username": test_admin.user_email,
+            "password": "testpassword123"
+        }
+    )
+    assert response.status_code == 200
+    return response.json()["access_token"]
+
+
+@pytest.fixture
+def admin_auth_headers(admin_auth_token):
+    """Get authorization headers with admin token."""
+    return {"Authorization": f"Bearer {admin_auth_token}"}
 
 
 @pytest.fixture

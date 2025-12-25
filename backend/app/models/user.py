@@ -9,6 +9,7 @@ class User(Base):
     id = Column(String, primary_key=True, index=True)    
     user_email = Column(String, unique=True, index=True)
     user_name = Column(String, index=True)
-    pwd = Column(String, index=True)    
+    pwd = Column(String, index=True)
+    role = Column(String, index=True, default="normal")  # "admin" or "normal"
     tasks = relationship("Task", back_populates="assigned_to_user")
 

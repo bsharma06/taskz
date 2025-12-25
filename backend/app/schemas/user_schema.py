@@ -6,6 +6,7 @@ class UserBase(BaseModel):
     """Base user schema."""
     user_email: EmailStr
     user_name: str
+    role: Optional[str] = "normal"  # "admin" or "normal"
 
 
 class UserCreate(UserBase):
@@ -23,5 +24,6 @@ class UserUpdate(BaseModel):
 class UserRead(UserBase):
     """Schema for reading a user."""
     id: str
+    role: str
 
     model_config = ConfigDict(from_attributes=True)

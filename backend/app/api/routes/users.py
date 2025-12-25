@@ -25,8 +25,12 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List all users."""
-    users = db.query(User).all()
+    """List all users. Admin can see all users, normal users can only see themselves."""
+    if current_user.role == "admin":
+        users = db.query(User).all()
+    else:
+        # Normal users can only see themselves
+        users = [current_user]
     return users
 
 
@@ -37,9 +41,10 @@ def add_user(
     token: Optional[str] = Depends(get_optional_token)
 ):
     """Create a new user. If user is new, allow creation without auth. If user exists, require auth."""
-    # Check if user email already exists
+    # Check if user email already exists (convert to lowercase for comparison)
+    user_email_lower = user_in.user_email.lower()
     existing_user = db.query(User).filter(
-        User.user_email == user_in.user_email
+        User.user_email == user_email_lower
     ).first()
     
     # If user exists, require authentication
@@ -74,12 +79,19 @@ def add_user(
     # User is new, allow creation without auth
     # Hash password
     hashed_password = get_password_hash(user_in.pwd)
+    
+    # Convert email to lowercase
+    user_email_lower = user_in.user_email.lower()
+    
+    # Set default role to "normal" if not provided
+    user_role = user_in.role if user_in.role else "normal"
 
     new_user = User(
         id=str(uuid4()),
-        user_email=user_in.user_email,
+        user_email=user_email_lower,
         user_name=user_in.user_name,
         pwd=hashed_password,
+        role=user_role,
     )
 
     try:
@@ -101,13 +113,21 @@ def get_user(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get a user by ID."""
+    """Get a user by ID. Admin can see any user, normal users can only see themselves."""
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="User not found"
         )
+    
+    # Normal users can only see themselves
+    if current_user.role != "admin" and user.id != current_user.id:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this user"
+        )
+    
     return user
 
 
@@ -134,9 +154,10 @@ def update_user(
         )
 
     # Check if email is being changed and if it's already taken
-    if user_in.user_email and user_in.user_email != user.user_email:
+    if user_in.user_email and user_in.user_email.lower() != user.user_email:
+        user_email_lower = user_in.user_email.lower()
         existing_user = db.query(User).filter(
-            User.user_email == user_in.user_email,
+            User.user_email == user_email_lower,
             User.id != user_id
         ).first()
         if existing_user:
@@ -144,7 +165,7 @@ def update_user(
                 status_code=status.HTTP_400_BAD_REQUEST,
                 detail="User with this email already exists"
             )
-        user.user_email = user_in.user_email
+        user.user_email = user_email_lower
 
     if user_in.user_name is not None:
         user.user_name = user_in.user_name

@@ -29,7 +29,9 @@ def login(
 ):
     """Login endpoint to get access token."""
     # OAuth2PasswordRequestForm uses 'username' field, but we'll treat it as email
-    user = db.query(User).filter(User.user_email == form_data.username).first()
+    # Convert to lowercase for comparison
+    username_lower = form_data.username.lower()
+    user = db.query(User).filter(User.user_email == username_lower).first()
     if not user or not verify_password(form_data.password, user.pwd):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,

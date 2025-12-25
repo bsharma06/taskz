@@ -1,5 +1,6 @@
 from uuid import uuid4
 from fastapi import APIRouter, Depends, HTTPException, status
+from sqlalchemy import or_
 from sqlalchemy.orm import Session
 from app.db.session import SessionLocal
 from app.models.task import Task
@@ -25,8 +26,15 @@ def list_tasks(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """List all tasks."""
-    tasks = db.query(Task).all()
+    """List all tasks. Admin can see all tasks, normal users can only see tasks created by them."""
+    if current_user.role == "admin":
+        tasks = db.query(Task).all()
+    else:
+        # Normal users can only see tasks created by them
+        tasks = db.query(Task).filter(
+            (Task.created_by == current_user.user_email.lower()) |
+            (Task.assigned_to == current_user.user_email.lower())
+        ).all()
     return tasks
 
 
@@ -47,6 +55,10 @@ def add_task(
     #         detail="Assigned user not found"
     #     )
 
+    # Convert created_by and assigned_to to lowercase
+    created_by_lower = task_in.created_by.lower()
+    assigned_to_lower = task_in.assigned_to.lower()
+    
     new_task = Task(
         id=str(uuid4()),
         title=task_in.title,
@@ -55,8 +67,8 @@ def add_task(
         due_date=task_in.due_date,
         priority=task_in.priority,
         status=task_in.status,
-        created_by=task_in.created_by,
-        assigned_to=task_in.assigned_to,
+        created_by=created_by_lower,
+        assigned_to=assigned_to_lower,
     )
 
     try:
@@ -78,13 +90,21 @@ def get_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Get a task by ID."""
+    """Get a task by ID. Admin can see any task, normal users can only see tasks created by them."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
         )
+    
+    # Normal users can only see tasks created by them
+    if current_user.role != "admin" and task.created_by != current_user.user_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to view this task"
+        )
+    
     return task
 
 
@@ -95,25 +115,33 @@ def update_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Update a task."""
+    """Update a task. Admin can update any task, normal users can only update tasks created by them."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
         )
+    
+    # Normal users can only update tasks created by them
+    if current_user.role != "admin" and task.created_by != current_user.user_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to update this task"
+        )
 
-    # If assigned_to is being updated, verify the user exists
+    # If assigned_to is being updated, verify the user exists and convert to lowercase
     if task_in.assigned_to is not None:
+        assigned_to_lower = task_in.assigned_to.lower()
         assigned_user = db.query(User).filter(
-            User.id == task_in.assigned_to
+            User.user_email == assigned_to_lower
         ).first()
         if not assigned_user:
             raise HTTPException(
                 status_code=status.HTTP_404_NOT_FOUND,
                 detail="Assigned user not found"
             )
-        task.assigned_to = task_in.assigned_to
+        task.assigned_to = assigned_to_lower
 
     if task_in.title is not None:
         task.title = task_in.title
@@ -146,12 +174,19 @@ def delete_task(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Delete a task."""
+    """Delete a task. Admin can delete any task, normal users can only delete tasks created by them."""
     task = db.query(Task).filter(Task.id == task_id).first()
     if not task:
         raise HTTPException(
             status_code=status.HTTP_404_NOT_FOUND,
             detail="Task not found"
+        )
+    
+    # Normal users can only delete tasks created by them
+    if current_user.role != "admin" and task.created_by != current_user.user_email.lower():
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Not authorized to delete this task"
         )
 
     try:
