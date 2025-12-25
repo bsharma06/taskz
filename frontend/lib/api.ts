@@ -70,6 +70,7 @@ export interface TaskStats {
   in_progress: number;
   completed: number;
   high_priority: number;
+  overdue?: number;
 }
 
 export const authApi = {
