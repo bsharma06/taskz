@@ -27,13 +27,30 @@ api.interceptors.request.use(
 
 // Handle 401 errors
 api.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    // Log successful responses for debugging
+    if (process.env.NODE_ENV === 'development') {
+      console.log('API Response:', response.status, response.config.url);
+    }
+    return response;
+  },
   (error) => {
+    // Log errors for debugging
+    console.error('API Error:', {
+      url: error.config?.url,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+    
     if (error.response?.status === 401) {
       if (typeof window !== 'undefined') {
         localStorage.removeItem('token');
         localStorage.removeItem('user');
-        window.location.href = '/signin';
+        // Only redirect if not already on signin page
+        if (window.location.pathname !== '/signin') {
+          window.location.href = '/signin';
+        }
       }
     }
     return Promise.reject(error);
@@ -79,17 +96,49 @@ export const authApi = {
     params.append('username', email);
     params.append('password', password);
     
-    // Create a new axios instance for this request to avoid Content-Type conflicts
-    const response = await axios.post<LoginResponse>(
-      `${API_BASE_URL}/auth/login`,
-      params.toString(),
-      {
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
+    try {
+      // Create a new axios instance for this request to avoid Content-Type conflicts
+      const response = await axios.post<LoginResponse>(
+        `${API_BASE_URL}/auth/login`,
+        params.toString(),
+        {
+          headers: {
+            'Content-Type': 'application/x-www-form-urlencoded',
+          },
+          timeout: 10000, // 10 second timeout
+          withCredentials: false, // Don't send credentials for login
+        }
+      );
+      
+      // Log response for debugging
+      console.log('Login response:', response.status, response.data);
+      
+      // Validate response
+      if (!response || !response.data) {
+        console.error('No response data received');
+        throw new Error('No response data from server');
       }
-    );
-    return response.data;
+      
+      if (!response.data.access_token) {
+        console.error('No access_token in response:', response.data);
+        throw new Error('Invalid response format from server - missing access_token');
+      }
+      
+      return response.data;
+    } catch (error: any) {
+      // Log the full error for debugging
+      console.error('Login API error:', error);
+      if (error.response) {
+        // Server responded with error status
+        throw error;
+      } else if (error.request) {
+        // Request made but no response
+        throw new Error('No response from server. Please check if the backend is running.');
+      } else {
+        // Something else happened
+        throw error;
+      }
+    }
   },
 
   getCurrentUser: async (): Promise<User> => {

@@ -20,24 +20,41 @@ export default function SignInPage() {
 
     try {
       const response = await authApi.login(email, password);
+      
+      // Check if response has access_token
+      if (!response || !response.access_token) {
+        throw new Error('Invalid response from server');
+      }
+      
       setStoredToken(response.access_token);
       
-      // Get user info
+      // Get user info - make this optional, don't block login if it fails
       try {
         const user = await authApi.getCurrentUser();
-        setStoredUser(user);
+        if (user) {
+          setStoredUser(user);
+        }
       } catch (userError: any) {
         console.error('Failed to get user info:', userError);
-        // Continue anyway - token is set
+        // Continue anyway - token is set, user can still proceed
       }
       
       router.push('/dashboard');
     } catch (err: any) {
       console.error('Login error:', err);
-      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error') {
+      console.error('Error details:', {
+        message: err.message,
+        code: err.code,
+        response: err.response,
+        stack: err.stack
+      });
+      
+      if (err.code === 'ERR_NETWORK' || err.message === 'Network Error' || err.message?.includes('Network')) {
         setError('Network error. Please make sure the backend server is running on http://localhost:8000');
+      } else if (err.response?.status === 401) {
+        setError('Invalid email or password');
       } else {
-        setError(err.response?.data?.detail || err.message || 'Invalid email or password');
+        setError(err.response?.data?.detail || err.message || 'Login failed. Please try again.');
       }
     } finally {
       setLoading(false);
