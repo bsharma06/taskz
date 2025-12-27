@@ -2,16 +2,17 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { taskApi, Task, TaskStats } from '@/lib/api';
+import { taskApi, userApi, Task, TaskStats, User } from '@/lib/api';
 import { isAuthenticated, getStoredUser, clearAuth } from '@/lib/auth';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileMenu } from '@/components/MobileMenu';
 import { StatsCards } from '@/components/StatsCards';
 import { TaskTable } from '@/components/TaskTable';
-import { TaskDetailModal } from '@/components/TaskDetailModal';
+import { TaskForm, TaskFormData } from '@/components/TaskForm';
+import { ToastContainer, ToastProps } from '@/components/ui/toast';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Search, Download, Plus, Clock, Bell, Power } from 'lucide-react';
+import { Search, Plus, Clock, Bell, Power } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
@@ -20,6 +21,7 @@ export default function DashboardPage() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
+  const [users, setUsers] = useState<User[]>([]);
   const [stats, setStats] = useState<TaskStats>({
     total: 0,
     pending: 0,
@@ -30,9 +32,10 @@ export default function DashboardPage() {
   });
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [showForm, setShowForm] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
+  const [toasts, setToasts] = useState<ToastProps[]>([]);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -41,6 +44,7 @@ export default function DashboardPage() {
     }
 
     loadTasks();
+    loadUsers();
   }, [router]);
 
   useEffect(() => {
@@ -56,6 +60,15 @@ export default function DashboardPage() {
       console.error('Failed to load tasks:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const loadUsers = async () => {
+    try {
+      const data = await userApi.getUsers();
+      setUsers(data);
+    } catch (error) {
+      console.error('Failed to load users:', error);
     }
   };
 
@@ -106,30 +119,96 @@ export default function DashboardPage() {
 
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
-    setIsModalOpen(true);
+    setShowForm(true);
   };
 
-  const handleExportCSV = () => {
-    const csvContent = [
-      ['Task', 'Status', 'Priority', 'Due Date', 'Assigned To'].join(','),
-      ...filteredTasks.map((task) =>
-        [
-          `"${task.title}"`,
-          task.status,
-          task.priority,
-          task.due_date,
-          task.assigned_to,
-        ].join(',')
-      ),
-    ].join('\n');
+  const handleNewTask = () => {
+    setSelectedTask(null);
+    setShowForm(true);
+  };
 
-    const blob = new Blob([csvContent], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'tasks.csv';
-    a.click();
-    window.URL.revokeObjectURL(url);
+  const handleEditTask = (task: Task) => {
+    setSelectedTask(task);
+    setShowForm(true);
+  };
+
+  const handleDeleteTask = async (task: Task) => {
+    if (!confirm(`Are you sure you want to delete "${task.title}"?`)) {
+      return;
+    }
+
+    try {
+      await taskApi.deleteTask(task.id);
+      await loadTasks();
+      showToast('Task deleted', 'The task has been successfully deleted.', 'success');
+    } catch (error) {
+      console.error('Failed to delete task:', error);
+      showToast('Error', 'Failed to delete task. Please try again.', 'error');
+    }
+  };
+
+  const handleSaveTask = async (formData: TaskFormData) => {
+    try {
+      const user = getStoredUser();
+      if (!user) {
+        throw new Error('User not found');
+      }
+
+      if (selectedTask) {
+        // Update existing task
+        await taskApi.updateTask(selectedTask.id, {
+          title: formData.title,
+          description: formData.description || null,
+          start_date: new Date(formData.start_date).toISOString(),
+          due_date: new Date(formData.due_date).toISOString(),
+          priority: formData.priority,
+          status: formData.status,
+          assigned_to: formData.assigned_to,
+        });
+        showToast('Task updated', 'The task has been successfully updated.', 'success');
+      } else {
+        // Create new task
+        await taskApi.createTask({
+          title: formData.title,
+          description: formData.description || '',
+          start_date: new Date(formData.start_date).toISOString(),
+          due_date: new Date(formData.due_date).toISOString(),
+          priority: formData.priority,
+          status: formData.status,
+          created_by: user.user_email,
+          assigned_to: formData.assigned_to,
+        });
+        showToast('Task added', 'The task has been successfully created.', 'success');
+      }
+
+      await loadTasks();
+      setShowForm(false);
+      setSelectedTask(null);
+    } catch (error) {
+      console.error('Failed to save task:', error);
+      showToast('Error', selectedTask ? 'Failed to update task.' : 'Failed to create task.', 'error');
+    }
+  };
+
+  const handleCancelForm = () => {
+    setShowForm(false);
+    setSelectedTask(null);
+  };
+
+  const showToast = (title: string, description: string, variant: 'default' | 'success' | 'error' = 'default') => {
+    const id = Date.now().toString();
+    const toast: ToastProps = {
+      id,
+      title,
+      description,
+      variant,
+      onClose: removeToast,
+    };
+    setToasts((prev) => [...prev, toast]);
+  };
+
+  const removeToast = (id: string) => {
+    setToasts((prev) => prev.filter((toast) => toast.id !== id));
   };
 
   const handleLogout = () => {
@@ -196,77 +275,77 @@ export default function DashboardPage() {
 
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto space-y-6">
-            {/* Greeting */}
-            {/* <div>
-              <h2 className="text-2xl font-semibold">
-                {getGreeting()} {user?.user_name || 'User'}!
-              </h2>
-            </div> */}
+            {/* Task Form - Shown at top when adding/editing */}
+            {showForm ? (
+              <TaskForm
+                task={selectedTask}
+                users={users}
+                currentUserEmail={getStoredUser()?.user_email || ''}
+                onSave={handleSaveTask}
+                onCancel={handleCancelForm}
+              />
+            ) : (
+              <>
+                {/* Statistics Cards */}
+                <StatsCards stats={stats} />
 
-            {/* Statistics Cards */}
-            <StatsCards stats={stats} />
-
-            {/* Task Management Section */}
-            <div className="space-y-4">
-              {/* <div>
-                <h3 className="text-xl font-semibold">Task Management</h3>
-                <p className="text-sm text-muted-foreground ">
-                  Here's a list of all your tasks.
-                </p>
-              </div> */}
-
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
-                {/* Left: Search + Status Filters */}
-                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
-                  {/* Search */}
-                  <div className="relative flex-1 max-w-md">
-                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                    <Input
-                      placeholder="Filter tasks..."
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                  {/* Status Filters */}
-                  <div className="flex flex-wrap gap-2 pt-2 sm:pt-0">
-                    {statusFilters.map((filter) => (
-                      <Button
-                        key={filter.value}
-                        variant={statusFilter === filter.value ? "default" : "outline"}
-                        size="sm"
-                        onClick={() => setStatusFilter(filter.value)}
-                        className={cn(
-                          statusFilter === filter.value && "bg-primary text-primary-foreground"
-                        )}
-                      >
-                        {filter.label}
+                {/* Task Management Section */}
+                <div className="space-y-4">
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+                    {/* Left: Search + Status Filters */}
+                    <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                      {/* Search */}
+                      <div className="relative flex-1 max-w-md">
+                        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                        <Input
+                          placeholder="Filter tasks..."
+                          value={searchQuery}
+                          onChange={e => setSearchQuery(e.target.value)}
+                          className="pl-9"
+                        />
+                      </div>
+                      {/* Status Filters */}
+                      <div className="flex flex-wrap gap-2 pt-2 sm:pt-0">
+                        {statusFilters.map((filter) => (
+                          <Button
+                            key={filter.value}
+                            variant={statusFilter === filter.value ? "default" : "outline"}
+                            size="sm"
+                            onClick={() => setStatusFilter(filter.value)}
+                            className={cn(
+                              statusFilter === filter.value && "bg-primary text-primary-foreground"
+                            )}
+                          >
+                            {filter.label}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                    {/* Right: Add Task Button */}
+                    <div className="flex w-full sm:w-auto justify-end">
+                      <Button className="gap-2" onClick={handleNewTask}>
+                        <Plus className="h-4 w-4" />
+                        Add Task
                       </Button>
-                    ))}
+                    </div>
                   </div>
-                </div>
-                {/* Right: Add Task Button */}
-                <div className="flex w-full sm:w-auto justify-end">
-                  <Button className="gap-2">
-                    <Plus className="h-4 w-4" />
-                    Add Task
-                  </Button>
-                </div>
-              </div>
 
-              {/* Tasks Table */}
-              <TaskTable tasks={filteredTasks} onTaskClick={handleTaskClick} />
-            </div>
+                  {/* Tasks Table */}
+                  <TaskTable
+                    tasks={filteredTasks}
+                    onTaskClick={handleTaskClick}
+                    onEdit={handleEditTask}
+                    onDelete={handleDeleteTask}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </main>
       </div>
 
-      {/* Task Detail Modal */}
-      <TaskDetailModal
-        task={selectedTask}
-        open={isModalOpen}
-        onOpenChange={setIsModalOpen}
-      />
+      {/* Toast Notifications */}
+      <ToastContainer toasts={toasts} onClose={removeToast} />
     </div>
   );
 }

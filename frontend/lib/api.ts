@@ -157,6 +157,11 @@ export const userApi = {
     });
     return response.data;
   },
+
+  getUsers: async (): Promise<User[]> => {
+    const response = await api.get<User[]>('/users/');
+    return response.data;
+  },
 };
 
 export const taskApi = {

@@ -23,9 +23,11 @@ import { MoreVertical, ArrowUpDown } from 'lucide-react';
 interface TaskTableProps {
   tasks: Task[];
   onTaskClick: (task: Task) => void;
+  onEdit?: (task: Task) => void;
+  onDelete?: (task: Task) => void;
 }
 
-export function TaskTable({ tasks, onTaskClick }: TaskTableProps) {
+export function TaskTable({ tasks, onTaskClick, onEdit, onDelete }: TaskTableProps) {
   const getStatusBadge = (status: string) => {
     const statusMap: Record<string, { label: string; className: string }> = {
       completed: {
@@ -69,8 +71,11 @@ export function TaskTable({ tasks, onTaskClick }: TaskTableProps) {
 
   const handleTaskAction = (e: React.MouseEvent, action: string, task: Task) => {
     e.stopPropagation();
-    // Handle task actions (edit, delete, etc.)
-    console.log(action, task);
+    if (action === 'edit' && onEdit) {
+      onEdit(task);
+    } else if (action === 'delete' && onDelete) {
+      onDelete(task);
+    }
   };
 
   if (tasks.length === 0) {
@@ -142,17 +147,16 @@ export function TaskTable({ tasks, onTaskClick }: TaskTableProps) {
                   </DropdownMenuTrigger>
                   <DropdownMenuContent align="end">
                     <DropdownMenuItem onClick={() => onTaskClick(task)}>
-                      View Details
-                    </DropdownMenuItem>
-                    <DropdownMenuItem onClick={(e) => handleTaskAction(e, 'edit', task)}>
                       Edit Task
                     </DropdownMenuItem>
-                    <DropdownMenuItem 
-                      onClick={(e) => handleTaskAction(e, 'delete', task)}
-                      className="text-destructive focus:text-destructive"
-                    >
-                      Delete Task
-                    </DropdownMenuItem>
+                    {onDelete && (
+                      <DropdownMenuItem 
+                        onClick={(e) => handleTaskAction(e, 'delete', task)}
+                        className="text-destructive focus:text-destructive"
+                      >
+                        Delete Task
+                      </DropdownMenuItem>
+                    )}
                   </DropdownMenuContent>
                 </DropdownMenu>
               </TableCell>

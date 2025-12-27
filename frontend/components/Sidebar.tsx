@@ -28,9 +28,9 @@ import {
 const navigation = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
   { name: 'Kanban Board', href: '#', icon: KanbanSquare },
-  { name: 'Settings', href: '#', icon: Settings },
-  { name: 'Privacy Policy', href: '#', icon: Shield },
-  { name: 'Support', href: '#', icon: HelpCircle },
+  { name: 'Settings', href: '/settings', icon: Settings },
+  { name: 'Privacy Policy', href: '/privacy-policy', icon: Shield },
+  { name: 'Support', href: '/support', icon: HelpCircle },
 ];
 
 export function Sidebar() {
