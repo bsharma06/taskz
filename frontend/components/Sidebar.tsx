@@ -124,9 +124,8 @@ export function Sidebar() {
                 </div>
               </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56">
-              <DropdownMenuItem>Profile</DropdownMenuItem>
-              <DropdownMenuItem>Settings</DropdownMenuItem>
+            <DropdownMenuContent align="end" className="w-56">              
+              <DropdownMenuItem><Link href="/settings">Profile</Link></DropdownMenuItem>            
               <DropdownMenuItem onClick={handleLogout} className="text-destructive focus:text-destructive">
                 Logout
               </DropdownMenuItem>
