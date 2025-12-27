@@ -3,14 +3,23 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
-import { Menu, X } from 'lucide-react';
+import { Menu, X, LayoutDashboard, KanbanSquare, Settings, Shield, HelpCircle, User } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { clearAuth } from '@/lib/auth';
+import { clearAuth, getStoredUser } from '@/lib/auth';
+
+const mobileNavigation = [
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard },
+  { name: 'Kanban Board', href: '#', icon: KanbanSquare },
+  { name: 'Settings', href: '#', icon: Settings },
+  { name: 'Privacy Policy', href: '#', icon: Shield },
+  { name: 'Support', href: '#', icon: HelpCircle },
+];
 
 export function MobileMenu() {
   const [open, setOpen] = useState(false);
   const pathname = usePathname();
   const router = useRouter();
+  const user = getStoredUser();
 
   const handleLogout = () => {
     clearAuth();
@@ -37,32 +46,49 @@ export function MobileMenu() {
             <div className="flex h-full flex-col p-4">
               <h1 className="text-xl font-bold mb-4">Taskz</h1>
               <nav className="flex-1 space-y-2">
-                <Link
-                  href="/dashboard"
-                  onClick={() => setOpen(false)}
-                  className={`block rounded-lg px-3 py-2 text-sm font-medium ${
-                    pathname === '/dashboard'
-                      ? 'bg-primary text-primary-foreground'
-                      : 'text-muted-foreground hover:bg-accent'
-                  }`}
-                >
-                  Dashboard
-                </Link>
-                <Link
-                  href="/dashboard"
-                  onClick={() => setOpen(false)}
-                  className="block rounded-lg px-3 py-2 text-sm font-medium text-muted-foreground hover:bg-accent"
-                >
-                  Tasks
-                </Link>
+                {mobileNavigation.map((item) => {
+                  const Icon = item.icon;
+                  const isActive = pathname === item.href;
+                  return (
+                    <Link
+                      key={item.name}
+                      href={item.href}
+                      onClick={() => setOpen(false)}
+                      className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
+                        isActive
+                          ? 'bg-accent text-accent-foreground'
+                          : 'text-muted-foreground hover:bg-accent'
+                      }`}
+                    >
+                      <Icon className="h-5 w-5" />
+                      {item.name}
+                    </Link>
+                  );
+                })}
               </nav>
-              <Button
-                variant="ghost"
-                className="w-full justify-start"
-                onClick={handleLogout}
-              >
-                Sign out
-              </Button>
+              {/* User Profile */}
+              <div className="border-t pt-4 mt-4">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="h-8 w-8 rounded-full bg-primary/10 flex items-center justify-center">
+                    <User className="h-4 w-4 text-primary" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium truncate">
+                      {user?.user_name || 'User'}
+                    </div>
+                    <div className="text-xs text-muted-foreground truncate">
+                      {user?.user_email || 'user@example.com'}
+                    </div>
+                  </div>
+                </div>
+                <Button
+                  variant="ghost"
+                  className="w-full justify-start"
+                  onClick={handleLogout}
+                >
+                  Sign out
+                </Button>
+              </div>
             </div>
           </div>
         </>
@@ -70,4 +96,3 @@ export function MobileMenu() {
     </div>
   );
 }
-

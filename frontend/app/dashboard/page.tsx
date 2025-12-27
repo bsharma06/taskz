@@ -3,16 +3,23 @@
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { taskApi, Task, TaskStats } from '@/lib/api';
-import { isAuthenticated, getStoredUser } from '@/lib/auth';
+import { isAuthenticated, getStoredUser, clearAuth } from '@/lib/auth';
 import { Sidebar } from '@/components/Sidebar';
 import { MobileMenu } from '@/components/MobileMenu';
 import { StatsCards } from '@/components/StatsCards';
 import { TaskTable } from '@/components/TaskTable';
 import { TaskDetailModal } from '@/components/TaskDetailModal';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Search, Download, Plus, Clock, Bell, Power } from 'lucide-react';
+import { cn } from '@/lib/utils';
+
+type StatusFilter = 'all' | 'pending' | 'in_progress' | 'completed';
 
 export default function DashboardPage() {
   const router = useRouter();
   const [tasks, setTasks] = useState<Task[]>([]);
+  const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [stats, setStats] = useState<TaskStats>({
     total: 0,
     pending: 0,
@@ -24,6 +31,8 @@ export default function DashboardPage() {
   const [loading, setLoading] = useState(true);
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -33,6 +42,10 @@ export default function DashboardPage() {
 
     loadTasks();
   }, [router]);
+
+  useEffect(() => {
+    filterTasks();
+  }, [tasks, searchQuery, statusFilter]);
 
   const loadTasks = async () => {
     try {
@@ -64,9 +77,71 @@ export default function DashboardPage() {
     setStats(newStats);
   };
 
+  const filterTasks = () => {
+    let filtered = [...tasks];
+
+    // Apply status filter
+    if (statusFilter !== 'all') {
+      filtered = filtered.filter((task) => {
+        if (statusFilter === 'pending') return task.status === 'pending';
+        if (statusFilter === 'in_progress') return task.status === 'in_progress';
+        if (statusFilter === 'completed') return task.status === 'completed';
+        return true;
+      });
+    }
+
+    // Apply search filter
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      filtered = filtered.filter(
+        (task) =>
+          task.title.toLowerCase().includes(query) ||
+          task.description?.toLowerCase().includes(query) ||
+          task.assigned_to.toLowerCase().includes(query)
+      );
+    }
+
+    setFilteredTasks(filtered);
+  };
+
   const handleTaskClick = (task: Task) => {
     setSelectedTask(task);
     setIsModalOpen(true);
+  };
+
+  const handleExportCSV = () => {
+    const csvContent = [
+      ['Task', 'Status', 'Priority', 'Due Date', 'Assigned To'].join(','),
+      ...filteredTasks.map((task) =>
+        [
+          `"${task.title}"`,
+          task.status,
+          task.priority,
+          task.due_date,
+          task.assigned_to,
+        ].join(',')
+      ),
+    ].join('\n');
+
+    const blob = new Blob([csvContent], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = 'tasks.csv';
+    a.click();
+    window.URL.revokeObjectURL(url);
+  };
+
+  const handleLogout = () => {
+    clearAuth();
+    router.push('/signin');
+  };
+
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good Morning';
+    if (hour < 18) return 'Good Afternoon';
+    return 'Good Evening';
   };
 
   if (loading) {
@@ -77,30 +152,110 @@ export default function DashboardPage() {
     );
   }
 
+  const user = getStoredUser();
+  const statusFilters = [
+    { label: 'All', value: 'all' as StatusFilter },
+    { label: 'Upcoming', value: 'pending' as StatusFilter },
+    { label: 'In Progress', value: 'in_progress' as StatusFilter },
+    { label: 'Completed', value: 'completed' as StatusFilter },
+  ];
+
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
       <MobileMenu />
       <div className="flex-1 flex flex-col overflow-hidden md:ml-64">
-        <main className="flex-1 overflow-y-auto p-6">
-          <div className="max-w-7xl mx-auto space-y-6">
-            {/* Header */}
+        {/* Top Header Bar */}
+        <header className="border-b bg-card px-6 py-4">
+          <div className="flex items-center justify-between">
+
             <div>
-              <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-              <p className="text-muted-foreground">
-                Welcome back, {getStoredUser()?.user_name || 'User'}
+              <h3 className="text-xl font-semibold">Dashboard</h3>
+              <p className="text-sm text-muted-foreground">
+                {getGreeting()}, {user?.user_name || 'User'}!
               </p>
             </div>
+            <div className="flex items-center gap-2">
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Clock className="h-5 w-5" />
+              </Button>
+              <Button variant="ghost" size="icon" className="h-9 w-9">
+                <Bell className="h-5 w-5" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9"
+                onClick={handleLogout}
+              >
+                <Power className="h-5 w-5" />
+              </Button>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 overflow-y-auto p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            {/* Greeting */}
+            {/* <div>
+              <h2 className="text-2xl font-semibold">
+                {getGreeting()} {user?.user_name || 'User'}!
+              </h2>
+            </div> */}
 
             {/* Statistics Cards */}
             <StatsCards stats={stats} />
 
-            {/* Tasks Table */}
+            {/* Task Management Section */}
             <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h2 className="text-2xl font-semibold tracking-tight">Tasks</h2>
+              {/* <div>
+                <h3 className="text-xl font-semibold">Task Management</h3>
+                <p className="text-sm text-muted-foreground ">
+                  Here's a list of all your tasks.
+                </p>
+              </div> */}
+
+              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 w-full">
+                {/* Left: Search + Status Filters */}
+                <div className="flex flex-col sm:flex-row sm:items-center gap-2 w-full sm:w-auto">
+                  {/* Search */}
+                  <div className="relative flex-1 max-w-md">
+                    <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Filter tasks..."
+                      value={searchQuery}
+                      onChange={e => setSearchQuery(e.target.value)}
+                      className="pl-9"
+                    />
+                  </div>
+                  {/* Status Filters */}
+                  <div className="flex flex-wrap gap-2 pt-2 sm:pt-0">
+                    {statusFilters.map((filter) => (
+                      <Button
+                        key={filter.value}
+                        variant={statusFilter === filter.value ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setStatusFilter(filter.value)}
+                        className={cn(
+                          statusFilter === filter.value && "bg-primary text-primary-foreground"
+                        )}
+                      >
+                        {filter.label}
+                      </Button>
+                    ))}
+                  </div>
+                </div>
+                {/* Right: Add Task Button */}
+                <div className="flex w-full sm:w-auto justify-end">
+                  <Button className="gap-2">
+                    <Plus className="h-4 w-4" />
+                    Add Task
+                  </Button>
+                </div>
               </div>
-              <TaskTable tasks={tasks} onTaskClick={handleTaskClick} />
+
+              {/* Tasks Table */}
+              <TaskTable tasks={filteredTasks} onTaskClick={handleTaskClick} />
             </div>
           </div>
         </main>
