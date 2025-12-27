@@ -104,7 +104,7 @@ export function TaskForm({ task, users, currentUserEmail, onSave, onCancel }: Ta
   };
 
   return (
-    <Card className="w-full">
+    <Card className="w-full shadow-none border-none">
       <CardHeader>
         <div className="flex items-center justify-between">
           <CardTitle>{task ? 'Edit Task' : 'Create New Task'}</CardTitle>

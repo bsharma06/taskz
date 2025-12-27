@@ -12,9 +12,11 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Clock, Bell, Power, HelpCircle, Mail, MessageSquare, Book, FileText } from 'lucide-react';
 import { ToastContainer, ToastProps } from '@/components/ui/toast';
+import type { User } from '@/lib/api';
 
 export default function SupportPage() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
   const [toasts, setToasts] = useState<ToastProps[]>([]);
   const [formData, setFormData] = useState({
     name: '',
@@ -30,11 +32,13 @@ export default function SupportPage() {
       return;
     }
 
-    const user = getStoredUser();
-    if (user) {
+    // Load user data client-side only
+    const currentUser = getStoredUser();
+    setUser(currentUser);
+    if (currentUser) {
       setFormData({
-        name: user.user_name || '',
-        email: user.user_email || '',
+        name: currentUser.user_name || '',
+        email: currentUser.user_email || '',
         subject: '',
         message: '',
       });
@@ -90,8 +94,6 @@ export default function SupportPage() {
       setSubmitting(false);
     }
   };
-
-  const user = getStoredUser();
 
   return (
     <div className="flex h-screen bg-background">

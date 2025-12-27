@@ -22,6 +22,7 @@ export default function DashboardPage() {
   const [tasks, setTasks] = useState<Task[]>([]);
   const [filteredTasks, setFilteredTasks] = useState<Task[]>([]);
   const [users, setUsers] = useState<User[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [stats, setStats] = useState<TaskStats>({
     total: 0,
     pending: 0,
@@ -43,6 +44,8 @@ export default function DashboardPage() {
       return;
     }
 
+    // Load user data client-side only to avoid hydration mismatch
+    setUser(getStoredUser());
     loadTasks();
     loadUsers();
   }, [router]);
@@ -231,7 +234,6 @@ export default function DashboardPage() {
     );
   }
 
-  const user = getStoredUser();
   const statusFilters = [
     { label: 'All', value: 'all' as StatusFilter },
     { label: 'Upcoming', value: 'pending' as StatusFilter },
@@ -276,14 +278,14 @@ export default function DashboardPage() {
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-7xl mx-auto space-y-6">
             {/* Task Form - Shown at top when adding/editing */}
-            {showForm ? (
-              <TaskForm
-                task={selectedTask}
-                users={users}
-                currentUserEmail={getStoredUser()?.user_email || ''}
-                onSave={handleSaveTask}
-                onCancel={handleCancelForm}
-              />
+              {showForm ? (
+                <TaskForm
+                  task={selectedTask}
+                  users={users}
+                  currentUserEmail={user?.user_email || ''}
+                  onSave={handleSaveTask}
+                  onCancel={handleCancelForm}
+                />
             ) : (
               <>
                 {/* Statistics Cards */}

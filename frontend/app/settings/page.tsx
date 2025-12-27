@@ -138,8 +138,6 @@ export default function SettingsPage() {
     );
   }
 
-  const currentUser = getStoredUser();
-
   return (
     <div className="flex h-screen bg-background">
       <Sidebar />
@@ -151,7 +149,7 @@ export default function SettingsPage() {
             <div>
               <h3 className="text-xl font-semibold">Settings</h3>
               <p className="text-sm text-muted-foreground">
-                {getGreeting()}, {currentUser?.user_name || 'User'}!
+                {getGreeting()}, {user?.user_name || 'User'}!
               </p>
             </div>
             <div className="flex items-center gap-2">

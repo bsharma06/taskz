@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { isAuthenticated, getStoredUser, clearAuth } from '@/lib/auth';
 import { Sidebar } from '@/components/Sidebar';
@@ -8,15 +8,19 @@ import { MobileMenu } from '@/components/MobileMenu';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Clock, Bell, Power, Shield } from 'lucide-react';
+import type { User } from '@/lib/api';
 
 export default function PrivacyPolicyPage() {
   const router = useRouter();
+  const [user, setUser] = useState<User | null>(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
       router.push('/signin');
       return;
     }
+    // Load user data client-side only
+    setUser(getStoredUser());
   }, [router]);
 
   const handleLogout = () => {
@@ -30,8 +34,6 @@ export default function PrivacyPolicyPage() {
     if (hour < 18) return 'Good Afternoon';
     return 'Good Evening';
   };
-
-  const user = getStoredUser();
 
   return (
     <div className="flex h-screen bg-background">
@@ -68,7 +70,7 @@ export default function PrivacyPolicyPage() {
 
         <main className="flex-1 overflow-y-auto p-6">
           <div className="max-w-4xl mx-auto space-y-6">
-            <Card>
+            <Card className="shadow-none border-none">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Shield className="h-5 w-5" />
