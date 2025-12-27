@@ -457,13 +457,12 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 4. Write/update tests
 5. Submit a pull request
 
-## 📄 License
 
-This project is private and proprietary.
 
-## 👥 Author
+## 👥 Developer
 
 Developed for task management and productivity tracking.
+_Bhoopesh Sharma_
 
 ---
 
