@@ -462,8 +462,5 @@ NEXT_PUBLIC_API_URL=http://localhost:8000
 ## 👥 Developer
 
 Developed for task management and productivity tracking.
+
 _Bhoopesh Sharma_
-
----
-
-**Note**: Remember to change the JWT_SECRET and database credentials in production environments!
